@@ -65,8 +65,7 @@ class IconButton(QPushButton):
         self.onTop = True
         if self.hoverIcon:
             self.setIcon(self.hoverIcon)
-        self.setStyleSheet(f"background-color: {self.colorPalette.colors['accent_color_darker']}; "
-                        f"border-radius: 15")
+
 
 
     def leaveEvent(self, e):
@@ -74,5 +73,3 @@ class IconButton(QPushButton):
         self.onTop = False
         if self.unClickedIcon:
             self.setIcon(self.unClickedIcon)
-        self.setStyleSheet(f"background-color: {self.colorPalette.colors['primary_color']}; "
-                        f"border-radius: 15")

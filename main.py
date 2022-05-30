@@ -3,15 +3,20 @@ import sys
 import threading
 
 import psutil as psutil
+from PyQt5 import QtCore
 from PyQt5.QtCore import QSize
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QKeyEvent
 from PyQt5.QtWidgets import QMainWindow, QWidget, QApplication, QLabel
 
+from AudioManager import AudioManager
+from CheckButton import CheckButton
 from ColorPalette import ColorPalette
 from IconButton import IconButton
 from ShoppingList import ShoppingList
 from ShoppingListItem import ShoppingListItem
+from SqlDataBase import SqlDataBase
 from VoiceManager import VoiceManager
+from video.VideoManager import VideoManager
 
 
 class MainWindow(QMainWindow):
@@ -20,39 +25,25 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
 
         self.colorPalette = ColorPalette()
-        self.voice = VoiceManager()
-        self.vThread = threading.Thread(target=self.voice.start)
-        self.vThread.start()
+        self.voicemanager = VoiceManager()
+        self.voiceThread = None
+        self.videomanager = VideoManager()
+        self.videoThread = None
+        self.audiomanager = AudioManager()
+
+        self.dataBase = SqlDataBase()
 
         self.centralWidget = QWidget(self)
         self.menuWidget = QWidget(self.centralWidget)
 
         self.shopping_list = ShoppingList(self.centralWidget)
 
-        # self.contentWidget = QWidget()
-        # self.titleWidget = QWidget(self.contentWidget)
-        # self.taskWidget = QWidget(self.contentWidget)
-        self.list1Widget = ShoppingListItem()
-        self.list2Widget = ShoppingListItem()
-        self.list3Widget = ShoppingListItem()
-        self.list4Widget = ShoppingListItem()
-
-        self.shopping_list.addWidget(self.list1Widget)
-        self.shopping_list.addWidget(self.list2Widget)
-        self.shopping_list.addWidget(self.list3Widget)
-        self.shopping_list.addWidget(self.list4Widget)
-
-        self.searchWidget = IconButton(self.menuWidget, "search.png", "search_selected.png", "search_selected.png")
-        self.listWidget = IconButton(self.menuWidget, "list.png", "list_selected.png", "list_selected.png")
-        self.agendaWidget = IconButton(self.menuWidget, "agenda.png", "agenda_selected.png", "agenda_selected.png")
-        self.recorderWidget = IconButton(self.menuWidget, "recorder.png", "recorder_selected.png", "recorder_selected.png")
-        self.settingsWidget = IconButton(self.menuWidget, "settings.png", "settings_selected.png", "settings_selected.png")
-
-        # self.titleLabel = QLabel(self.titleWidget)
-        # self.tasksLabel = QLabel(self.taskWidget)
+        self.voiceCheckButton = CheckButton(self.menuWidget, "robot_off.svg", "robot_on.svg")
+        self.videoCheckButton = CheckButton(self.menuWidget, "mouse_off.svg", "mouse_on.svg")
+        self.addButton = IconButton(self.menuWidget, "plus.svg", "plus_hover.svg", "plus_hover.svg")
+        self.audioCheckButton = CheckButton(self.menuWidget, "sound_off.svg", "sound_on.svg")
 
         self.setup_ui()
-
 
     def setup_ui(self):
         self.setWindowTitle("Agenda")
@@ -64,53 +55,67 @@ class MainWindow(QMainWindow):
         self.menuWidget.setStyleSheet(f" background-color: {self.colorPalette.colors['primary_color']};"
                                       f" border-radius: 20")
 
-
-
         font = QFont()
         font.setFamily("Calibri")
         font.setPointSize(16)
         font.setBold(True)
         font.setWeight(75)
 
-        # self.titleWidget.setGeometry(27, 61, 1255, 95)
-        # self.titleWidget.setStyleSheet(f" background-color: {self.colorPalette.colors['secondary_color']};"
-        #                                f" border-radius: 10")
-        # self.titleLabel.setGeometry(33, 22, 95, 52)
-        # self.titleLabel.setText("Title :")
-        # self.titleLabel.setFont(font)
-        #
-        # self.taskWidget.setGeometry(27, 198, 1255, 565)
-        # self.taskWidget.setStyleSheet(f" background-color: {self.colorPalette.colors['secondary_color']};"
-        #                               f" border-radius: 10")
-        # self.tasksLabel.setGeometry(28, 27, 99, 39)
-        # self.tasksLabel.setText("Tasks :")
-        # self.tasksLabel.setFont(font)
+        self.voiceCheckButton.setGeometry(13, 102, 37, 37)
+        self.voiceCheckButton.setIconSize(QSize(37, 37))
+        self.voiceCheckButton.sound = f"state-change_confirm-down.wav"
+        self.voiceCheckButton.check_signal.connect(self.voice_check_button_clicked)
 
+        self.videoCheckButton.setGeometry(13, 238, 37, 37)
+        self.videoCheckButton.setIconSize(QSize(37, 37))
+        self.videoCheckButton.sound = f"state-change_confirm-down.wav"
+        self.videoCheckButton.check_signal.connect(self.video_check_button_clicked)
 
-        self.searchWidget.setGeometry(13, 102, 37, 37)
-        self.searchWidget.setIconSize(QSize(37, 37))
-        self.searchWidget.sound = f"ui_tap-variant-01.wav"
+        self.addButton.setGeometry(13, 374, 37, 37)
+        self.addButton.setIconSize(QSize(37, 37))
+        self.addButton.sound = f"ui_refresh-feed.wav"
+        self.addButton.click_signal.connect(self.add_button_clicked)
 
-        self.listWidget.setGeometry(13, 238, 37, 37)
-        self.listWidget.setIconSize(QSize(37, 37))
-        self.listWidget.sound = f"ui_unlock.wav"
+        self.audioCheckButton.setGeometry(13, 510, 37, 37)
+        self.audioCheckButton.setIconSize(QSize(37, 37))
+        self.audioCheckButton.sound = f"state-change_confirm-down.wav"
+        self.audioCheckButton.check_signal.connect(self.toggle_audio)
 
-        self.agendaWidget.setGeometry(13, 374, 37, 37)
-        self.agendaWidget.setIconSize(QSize(37, 37))
-        self.agendaWidget.sound = f"ui_refresh-feed.wav"
+    def toggle_audio(self, state):
+        self.audiomanager.is_on = state
+        if state:
+            self.audiomanager.play_sound("state-change_confirm-down.wav")
 
-        self.recorderWidget.setGeometry(13, 510, 37, 37)
-        self.recorderWidget.setIconSize(QSize(37, 37))
-        self.listWidget.sound = f"state-change_confirm-down.wav"
+    def voice_check_button_clicked(self, state):
+        if state:
+            self.voiceThread = threading.Thread(target=self.voicemanager.start)
+            self.voiceThread.start()
+        else:
+            self.voicemanager.quitFlag = False
 
-        self.settingsWidget.setGeometry(13, 646, 37, 37)
-        self.settingsWidget.setIconSize(QSize(37, 37))
-        self.settingsWidget.sound = f"alert_error-03.wav"
+    def video_check_button_clicked(self, state):
+        if state:
+            self.videoThread = threading.Thread(target=self.videomanager.start)
+            self.videoThread.start()
+        else:
+            self.videomanager.quitFlag = False
+
+    def add_button_clicked(self):
+        self.shopping_list.addNewItem(ShoppingListItem())
+
+    def keyReleaseEvent(self, event: QKeyEvent) -> None:
+        super(MainWindow, self).keyReleaseEvent(event)
+
+        if event.key() == QtCore.Qt.Key_Q:
+            print("Q")
+            threading.Thread(target=self.videomanager.start).start()
+
 
 def kill_proc_tree(pid, including_parent=True):
     parent = psutil.Process(pid)
     if including_parent:
         parent.kill()
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

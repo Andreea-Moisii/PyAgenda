@@ -4,6 +4,8 @@ from PyQt5.QtGui import QResizeEvent
 from PyQt5.QtWidgets import QScrollArea, QWidget, QVBoxLayout, QSpacerItem, QSizePolicy, QFrame, QLayout
 
 from ColorPalette import ColorPalette
+from ShoppingListItem import ShoppingListItem
+from SqlDataBase import SqlDataBase
 
 
 class ShoppingList(QScrollArea):
@@ -13,6 +15,9 @@ class ShoppingList(QScrollArea):
         self.scrollAreaWidgetContents = QWidget()
         self.orizontalLayout = QHBoxLayout(self.scrollAreaWidgetContents)
         self.spacerItem = QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.sql = SqlDataBase()
+        self.list = []
+
         self.setup_ui()
 
     def setup_ui(self):
@@ -40,8 +45,24 @@ class ShoppingList(QScrollArea):
         self.orizontalLayout.addSpacerItem(self.spacerItem)
 
         self.setWidget(self.scrollAreaWidgetContents)
+        self.populateFromDatabase()
 
-    def addWidget(self, widget):
-        self.orizontalLayout.removeItem(self.spacerItem)
-        self.orizontalLayout.addWidget(widget)
-        self.orizontalLayout.addItem(self.spacerItem)
+    def populateFromDatabase(self):
+        self.removeAllItems()
+        for item in self.sql.get_items():
+            self.addItem(ShoppingListItem(None, item))
+
+    def addItem(self, widget):
+        self.orizontalLayout.insertWidget(0, widget)
+        self.list.append(widget)
+        widget.delete_signal.connect(self.populateFromDatabase)
+
+    def addNewItem(self, item):
+        self.addItem(item)
+        self.sql.add_item(item.data)
+
+    def removeAllItems(self):
+        for item in self.list:
+            item.deleteLater()
+        self.list.clear()
+

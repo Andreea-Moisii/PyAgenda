@@ -2,6 +2,8 @@ import speech_recognition as sr
 import pyttsx3
 import win32clipboard
 
+
+
 class VoiceManager(object):
     def __new__(cls):
         if not hasattr(cls, 'instance'):
@@ -12,6 +14,8 @@ class VoiceManager(object):
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
         self.engine = pyttsx3.init()
+
+        self.quitFlag = False
 
     def speechToText(self):
         with self.microphone as source:
@@ -45,22 +49,30 @@ class VoiceManager(object):
 
         action = 'Listening'
         print(action)
-        quitFlag = True
-        while quitFlag:
+        self.quitFlag = True
+        while self.quitFlag:
+            print("is on: ", self.quitFlag)
             text = self.speechToText()
             if not text["success"] and text["error"] == "API unavailable":
                 print("ERROR: {}\nclose program".format(text["error"]))
                 break
             while not text["success"]:
+                if not self.quitFlag:
+                    break
                 print("I didn't catch that. What did you say?\n")
                 text = self.speechToText()
+            if not self.quitFlag:
+                break
+
             if text["transcription"].lower() == "exit":
-                quitFlag = False
+                self.quitFlag = False
             print(text["transcription"].lower())
             self.textToSpeech(text["transcription"].lower())
 
             if text["transcription"].lower() == "speak":
                 self.readFromClipboard()
+
+        self.textToSpeech("Goodbye")
 
     def readFromClipboard(self):
         win32clipboard.OpenClipboard()
